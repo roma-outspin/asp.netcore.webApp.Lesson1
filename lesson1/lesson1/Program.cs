@@ -14,20 +14,44 @@ namespace lesson1
 
         static async Task Main(string[] args)
         {
+            var GetResponseTasks = new List<Task<string>>();
             for (int i = 4; i < 14; i++)
             {
-                await GetResponse(i);
+                GetResponseTasks.Add(GetResponse(i));
             }
-           
+            var postTaskStrings = await Task.WhenAll<string>(GetResponseTasks);
+
+            for(int i = 0; i<10; i++)
+            {
+                var options = new JsonSerializerOptions()
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+                var result = JsonSerializer.Deserialize<Post>(postTaskStrings[i], options);
+                await File.AppendAllTextAsync(filePath, result + "\r\n");
+            }
 
         }
 
-        static async Task GetResponse(int postNumber)
+        static async Task<string> GetResponse(int postNumber)
         {
-            var response = await _jsonPHClient.GetAsync(@"https://jsonplaceholder.typicode.com/posts/"+postNumber);  
-            var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<Post>(content);
-            await File.AppendAllTextAsync(filePath, result + "\r\n");
+            HttpResponseMessage response;
+            int exceptionTimeout = 5000;
+
+            while (true)
+            {
+                try
+                {
+                    response = await _jsonPHClient.GetAsync(@"https://jsonplaceholder.typicode.com/posts/" + postNumber);
+                    break;
+                }
+                catch
+                {
+                    await Task.Delay(exceptionTimeout);
+                }
+            }
+              
+            return await response.Content.ReadAsStringAsync();
         }
 
 
